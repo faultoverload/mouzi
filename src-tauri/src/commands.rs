@@ -442,7 +442,7 @@ pub fn initialize_defaults_cmd() -> Result<(), String> {
 #[tauri::command]
 pub fn close_popup(app: AppHandle) {
     if let Some(window) = app.get_webview_window("popup") {
-        let _ = window.hide();
+        let _ = window.close();
     }
 }
 

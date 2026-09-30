@@ -113,16 +113,20 @@ pub fn show_popup_window(app: &AppHandle) {
         .build();
 
         if let Ok(win) = window {
+            // Destroy the webview on focus loss so the WebKit/WebView2/WKWebView
+            // helper process is reaped instead of living idle at 50-150 MB RSS.
+            // The popup rebuilds itself when the user clicks the tray again.
+            let popup = win.clone();
+            win.on_window_event(move |event| {
+                if matches!(
+                    event,
+                    tauri::WindowEvent::Focused(false) | tauri::WindowEvent::CloseRequested { .. }
+                ) {
+                    let _ = popup.destroy();
+                }
+            });
             #[cfg(target_os = "macos")]
-            {
-                position_popup(app, &win);
-                let popup = win.clone();
-                win.on_window_event(move |event| {
-                    if matches!(event, tauri::WindowEvent::Focused(false)) {
-                        let _ = popup.hide();
-                    }
-                });
-            }
+            position_popup(app, &win);
             let _ = win.show();
             let _ = win.set_focus();
         }
@@ -188,6 +192,18 @@ pub fn show_settings_window(app: &AppHandle) {
         .build();
 
         if let Ok(win) = window {
+            // Destroy the webview on focus loss so the WebKit/WebView2/WKWebView
+            // helper process is reaped instead of living idle at 50-150 MB RSS.
+            // Settings rebuilds itself when the user clicks the tray menu again.
+            let settings = win.clone();
+            win.on_window_event(move |event| {
+                if matches!(
+                    event,
+                    tauri::WindowEvent::Focused(false) | tauri::WindowEvent::CloseRequested { .. }
+                ) {
+                    let _ = settings.destroy();
+                }
+            });
             let _ = win.show();
             let _ = win.set_focus();
         }
