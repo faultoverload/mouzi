@@ -216,6 +216,19 @@ pub fn run() {
             explorer_integration_cmd,
             explorer_integration_status_cmd,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, event| match event {
+            // Keep the process alive in the tray when the user closes the
+            // popup/settings windows. With no declared startup window, Tauri
+            // would otherwise treat the empty-windows state as "user closed
+            // the app" and exit. code: None signals window-close; tray Quit
+            // passes code: Some(0) via AppHandle::exit() and is honored.
+            tauri::RunEvent::ExitRequested { code, api, .. } => {
+                if code.is_none() {
+                    api.prevent_exit();
+                }
+            }
+            _ => {}
+        });
 }
