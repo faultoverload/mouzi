@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Mouzi (headless)
+GenericName=File organizer
+Comment=Tray-only Mouzi daemon — organizes Downloads in the background without opening a window.
+Exec=mouzi --headless
+Icon=mouzi
+Terminal=false
+Categories=Utility;FileTools;
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
+# Mouzi's own autostart plugin writes a .desktop file at install time; this
+# variant is a hand-written alternative for users who prefer to enable the
+# service manually (`cp assets/autostart/mouzi-headless.desktop
+# ~/.config/autostart/`) or via a systemd user service. Keep both files in sync
+# if you fork.

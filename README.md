@@ -100,6 +100,68 @@ Auto-detects your system language. Supported:
 - **Portable version available** - run without installing, leaves no trace in the registry
 - All data stored locally in your user profile folder
 
+### 🪶 Headless / Service Mode
+
+`mouzi --headless` runs the same binary as the GUI path but **never creates a WebviewWindow** — no WebKitWebProcess, no WebKitNetworkProcess, no libLLVM, no libnvidia-gpucomp mapped at runtime. The branch happens in `main.rs` on `std::env::args()`; no separate package is shipped. Use it for:
+
+- **Long-running daemons** that organize `~/Downloads` on a server, NAS, or remote box.
+- **Low-RSS idle** on laptops or shared machines where ~474 MiB baseline (the GUI's idle working set, dominated by WebKit helper processes and `libLLVM`) is too much.
+- **Hybrid-GPU nvidia/Intel boxes** where every WebKit invocation eagerly pulls `libnvidia-gpucomp` into the working set even if you never open a window.
+
+#### Run ad-hoc
+
+```sh
+mouzi --headless   # same binary as `mouzi`; no separate install
+```
+
+The tray menu shows up at the same icon location as the GUI path and offers `Open GUI` (spawns the GUI in a sibling process), `Pause` / `Resume` (toggle folder modes in the shared SQLite db), and `Quit`.
+
+#### Run as a systemd user service (Linux)
+
+Install the unit shipped in `assets/systemd-user/mouzi-headless.service`:
+
+```sh
+mkdir -p ~/.config/systemd/user
+cp assets/systemd-user/mouzi-headless.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now mouzi-headless
+systemctl --user status mouzi-headless    # verify "active (running)"
+```
+
+The unit sets `WEBKIT_DISABLE_DMABUF_RENDERER=1`, `WEBKIT_DISABLE_COMPOSITING_MODE=1`, and `GSK_RENDERER=cairo` so the GTK/WebKit init paths stay on software rendering and `libnvidia-gpucomp` stays out of the process working set even on hybrid-GPU laptops. The unit's `ExecStart` assumes `/usr/bin/mouzi` — edit the file if you built from source and installed elsewhere (e.g. `~/.local/bin/mouzi`).
+
+#### Run as an XDG autostart entry
+
+For login-session autostart without systemd, copy the desktop file:
+
+```sh
+mkdir -p ~/.config/autostart
+cp assets/autostart/mouzi-headless.desktop ~/.config/autostart/
+```
+
+This is the same approach Mouzi's own `tauri-plugin-autostart` uses for the GUI build, just with `Exec=mouzi --headless` instead of `Exec=mouzi --autostart`.
+
+#### Expected memory footprint
+
+The 2026-09-30 memory audit (`~/Documents/Obsidian Vault/Research/2026-09-30-mouzi-memory-optimization-audit.md`) traced ~95% of the GUI path's 474 MiB baseline to WebKit helper processes and the LLVM/nvidia libraries that get mapped alongside the first WebView. By skipping the WebView entirely, `mouzi --headless` should hold the host working set to **<30 MiB** for the mouzi process itself plus no WebKit processes at all. Practical upper bound if your GTK init eagerly maps a few more shared libs: 50–80 MiB. Anything above 120 MiB is a regression worth investigating with `pmap -x <pid> | sort -k3 -n | tail -20`.
+
+Numbers from a real nvidia box will be captured after this lands — see [`docs/headless-memory-measurement.md`](docs/headless-memory-measurement.md) for the measurement recipe.
+
+#### Switching between headless and GUI
+
+Both modes share the same SQLite database (under `~/.local/share/mouzi/`), so rules and folder modes set in one carry over to the other. To reconfigure after starting headless:
+
+1. Click the tray menu → **Open GUI**. A GUI process spawns alongside the running headless one (single-instance plugin will refuse if you already have a GUI running).
+2. Edit rules / add folders / change settings in the GUI as usual.
+3. **Save** in the GUI. The headless process picks up the new state on its next folder scan (≤ 1 s) without needing to be restarted.
+
+Or, if you don't want two processes running, quit the headless one from the tray (`Quit` menu entry) before launching the GUI directly:
+
+```sh
+systemctl --user stop mouzi-headless     # if using the unit
+mouzi                                    # launch GUI; rules/state already saved
+```
+
 ---
 
 ## 🌍 Help translate Mouzi
