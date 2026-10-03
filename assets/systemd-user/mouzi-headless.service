@@ -1,0 +1,52 @@
+[Unit]
+Description=Mouzi headless file organizer (tray-only)
+Documentation=https://github.com/faultoverload/mouzi
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+# `mouzi --headless` is the same binary as the GUI path — see README "Headless /
+# Service Mode". The branch happens in main.rs on std::env::args(); no separate
+# package is shipped. If you installed Mouzi from a .deb / .AppImage, /usr/bin/mouzi
+# is the canonical path. If you built from source, adjust ExecStart to your binary
+# location (e.g. %h/.local/bin/mouzi).
+ExecStart=/usr/bin/mouzi --headless
+# Restart only on unexpected failure (non-zero exit code, signal, watchdog). The
+# tray menu's "Quit" item calls AppHandle::exit(0) which is a clean shutdown and
+# is NOT restarted — RestartPreventExitStatus=0 + SuccessExitStatus=0 covers it.
+Restart=on-failure
+RestartPreventExitStatus=0
+SuccessExitStatus=0
+
+# Environment hygiene for the WebKitGTK shared-process model: the prototype's
+# DMABuf workaround is already applied in main.rs (see the WEBKIT_DISABLE_DMABUF_RENDERER
+# block at the top of src-tauri/src/main.rs), so we don't re-export it here. The
+# variables below are belt-and-braces fallbacks observed to help on Wayland
+# sessions where the system compositor still pulls libLLVM / libnvidia-gpucomp
+# even with no WebView requested.
+#
+#  * WEBKIT_DISABLE_DMABUF_RENDERER=1 — set by main.rs on Linux already, listed
+#    here for completeness so a packaged unit survives a future code refactor.
+#  * WEBKIT_DISABLE_COMPOSITING_MODE=1 — skip WebKit's compositor layer (saves
+#    another few MiB if a stray WebView is ever created by a future plugin).
+#  * GSK_RENDERER=cairo — force GTK4 to the cairo renderer instead of GL/nvidia,
+#    which keeps libnvidia-gpucomp out of the process working set on hybrid GPUs.
+Environment=WEBKIT_DISABLE_DMABUF_RENDERER=1
+Environment=WEBKIT_DISABLE_COMPOSITING_MODE=1
+Environment=GSK_RENDERER=cairo
+
+# Hardening — `mouzi --headless` only touches ~/Downloads and the user's
+# SQLite db under ~/.local/share/mouzi (see directories::ProjectDirs). Network
+# access is via WebKitGTK (headless mode never invokes it, but Tauri's updater
+# plugin might on first run); allow outbound for the GitHub release metadata
+# endpoint used by tauri-plugin-updater. Restrict filesystem writes to the
+# project data dir and $HOME/Downloads.
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/Downloads %h/.local/share/mouzi %h/.local/share/mouzi-beta
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
