@@ -3,6 +3,7 @@ pub mod archive;
 mod beta_tests;
 pub mod commands;
 pub mod db;
+pub mod headless;
 pub mod i18n;
 pub mod ignore;
 pub mod integration;

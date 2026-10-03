@@ -11,5 +11,12 @@ fn main() {
     if std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").is_err() {
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     }
-    mouzi_lib::run()
+
+    // Branch on a runtime CLI flag — single binary, no Cargo features.
+    // `mouzi --headless` skips every webview-window code path in `run()`.
+    if std::env::args().any(|a| a == "--headless") {
+        mouzi_lib::headless::run_headless();
+    } else {
+        mouzi_lib::run();
+    }
 }
